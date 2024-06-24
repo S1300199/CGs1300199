@@ -13,13 +13,15 @@
 static int g_smooth = 0;
 
 int style = 0;
+int diff = 0;
+static GLfloat Eye[3] = {0, 0, 10};
+static float fd[3];
 
 // Current material color 
 static GLfloat g_mat_amb[4];  // ka
 static GLfloat g_mat_diff[4]; // kd
 static GLfloat g_mat_spec[4]; // ks
 static GLfloat g_mat_shiny;   // m
-
 
 // Light properties
 #define MAX_NUM_LIGHTS 10 // Max allowed number of lights 
@@ -116,59 +118,68 @@ static void BlinnPhongModel(GLfloat* pe, GLfloat* ne, GLfloat* out_color) {
     ka[0] = g_mat_amb[0];
     ka[1] = g_mat_amb[1];
     ka[2] = g_mat_amb[2];
-    ka[3] = g_mat_amb[3];
+   
     GLfloat I[4];
-    I[0] = g_light_amb[g_num_lights][0];
-    I[1] = g_light_amb[g_num_lights][1];
-    I[2] = g_light_amb[g_num_lights][2];
-    I[3] = g_light_amb[g_num_lights][3];
-    GLfloat Ia[4] = {ka[0]*I[0], ka[1]*I[1], ka[2]*I[2], ka[3]*I[3]};
+    I[0] = g_light_amb[0][0];
+    I[1] = g_light_amb[0][1];
+    I[2] = g_light_amb[0][2];
+    
+    GLfloat Ia[4] = {ka[0]*I[0], ka[1]*I[1], ka[2]*I[2]};
     //Diffuse reflection
     GLfloat N[4];
-    N[0] = ne[0];
-    N[1] = ne[1];
-    N[2] = ne[2];
-    N[3] = ne[3];
+    GLfloat UnitN = sqrt(ne[0]*ne[0] + ne[1]*ne[1] + ne[2]*ne[2]);
+    N[0] = ne[0]/UnitN;
+    N[1] = ne[1]/UnitN;
+    N[2] = ne[2]/UnitN;
+   
     GLfloat L[4];
-    L[0] = g_light_pos[g_num_lights][0] - pe[0];
-    L[1] = g_light_pos[g_num_lights][1] - pe[1];
-    L[2] = g_light_pos[g_num_lights][2] - pe[2];
-    L[3] = g_light_pos[g_num_lights][3] - pe[3];
+    L[0] = g_light_pos[0][0] - pe[0];
+    L[1] = g_light_pos[0][1] - pe[1];
+    L[2] = g_light_pos[0][2] - pe[2];
+    
+    GLfloat UnitL = sqrt(L[0]*L[0] + L[1]*L[1] + L[2]*L[2]);
+    L[0] /= UnitL;
+    L[1] /= UnitL;
+    L[2] /= UnitL;
+    
+    
     GLfloat kd[4];
     kd[0] = g_mat_diff[0];
     kd[1] = g_mat_diff[1];
     kd[2] = g_mat_diff[2];
-    kd[3] = g_mat_diff[3];
-    I[0] = g_light_diff[g_num_lights][0];
-    I[1] = g_light_diff[g_num_lights][1];
-    I[2] = g_light_diff[g_num_lights][2];
-    I[3] = g_light_diff[g_num_lights][3];
+    
+    I[0] = g_light_diff[0][0];
+    I[1] = g_light_diff[0][1];
+    I[2] = g_light_diff[0][2];
+    
 
     GLfloat kdI[4];
     kdI[0] = kd[0] * I[0];
     kdI[1] = kd[1] * I[1];
     kdI[2] = kd[2] * I[2];
-    kdI[3] = kd[3] * I[3];
+    
     
     GLfloat Id[4];
-    Id[0] = kdI[0] * fmax(N[0]*L[0] + N[1]*L[1] + N[2]*L[2] + N[3]*L[3],0);
-    Id[1] = kdI[1] * fmax(N[0]*L[0] + N[1]*L[1] + N[2]*L[2] + N[3]*L[3],0);
-    Id[2] = kdI[2] * fmax(N[0]*L[0] + N[1]*L[1] + N[2]*L[2] + N[3]*L[3],0);
-    Id[3] = kdI[3] * fmax(N[0]*L[0] + N[1]*L[1] + N[2]*L[2] + N[3]*L[3],0);
+    Id[0] = kdI[0] * fmax(N[0]*L[0] + N[1]*L[1] + N[2]*L[2],0);
+    Id[1] = kdI[1] * fmax(N[0]*L[0] + N[1]*L[1] + N[2]*L[2],0);
+    Id[2] = kdI[2] * fmax(N[0]*L[0] + N[1]*L[1] + N[2]*L[2],0);
+   
     
     //Specular reflection 1
-    GLfloat V[4] = {0,0,0,0};
+    GLfloat V[4];
+    V[0] = Eye[0]/sqrt(Eye[0]*Eye[0] + Eye[1]*Eye[1] + Eye[2]*Eye[2]);
+    V[1] = Eye[1]/sqrt(Eye[0]*Eye[0] + Eye[1]*Eye[1] + Eye[2]*Eye[2]);
+    V[2] = Eye[2]/sqrt(Eye[0]*Eye[0] + Eye[1]*Eye[1] + Eye[2]*Eye[2]);
+
     I[0] = -L[0];
     I[1] = -L[1];
-    I[2] = -L[2];
-    I[3] = -L[3];
-    GLfloat NL = (I[0]*N[0]+I[1]*N[1]+I[2]*N[2]+I[3]*N[3]);
+    I[2] = -L[2];;
+    GLfloat NL = (I[0]*N[0]+I[1]*N[1]+I[2]*N[2]);
     
     GLfloat R[4];
     R[0] = (I[0] - 2*N[0]*NL);
     R[1] = (I[1] - 2*N[1]*NL);
     R[2] = (I[2] - 2*N[2]*NL);
-    R[3] = (I[3] - 2*N[3]*NL);
     
     GLfloat G;
     if(-NL > 0)
@@ -184,73 +195,94 @@ static void BlinnPhongModel(GLfloat* pe, GLfloat* ne, GLfloat* out_color) {
     ks[0] = g_mat_spec[0];
     ks[1] = g_mat_spec[1];
     ks[2] = g_mat_spec[2];
-    ks[3] = g_mat_spec[3];
-    I[0] = g_light_spec[g_num_lights][0];
-    I[1] = g_light_spec[g_num_lights][1];
-    I[2] = g_light_spec[g_num_lights][2];
-    I[3] = g_light_spec[g_num_lights][3];
+   
+    I[0] = g_light_spec[0][0];
+    I[1] = g_light_spec[0][1];
+    I[2] = g_light_spec[0][2];
+    
 
     GLfloat ksIG[4];
     ksIG[0] = ks[0] * I[0] * G;
     ksIG[1] = ks[1] * I[1] * G;
     ksIG[2] = ks[2] * I[2] * G;
-    ksIG[3] = ks[3] * I[3] * G;
+   
 
     GLfloat Is[4];
     
-    Is[0] = ksIG[0] * powf(fmax(V[0]*R[0] + V[1]*R[1] + V[2]*R[2] + V[3]*R[3],0),g_mat_shiny);
-    Is[1] = ksIG[1] * powf(fmax(V[0]*R[0] + V[1]*R[1] + V[2]*R[2] + V[3]*R[3],0),g_mat_shiny);
-    Is[2] = ksIG[2] * powf(fmax(V[0]*R[0] + V[1]*R[1] + V[2]*R[2] + V[3]*R[3],0),g_mat_shiny);
-    Is[3] = ksIG[3] * powf(fmax(V[0]*R[0] + V[1]*R[1] + V[2]*R[2] + V[3]*R[3],0),g_mat_shiny);
+    Is[0] = ksIG[0] * powf(fmax(V[0]*R[0] + V[1]*R[1] + V[2]*R[2],0),g_mat_shiny);
+    Is[1] = ksIG[1] * powf(fmax(V[0]*R[0] + V[1]*R[1] + V[2]*R[2],0),g_mat_shiny);
+    Is[2] = ksIG[2] * powf(fmax(V[0]*R[0] + V[1]*R[1] + V[2]*R[2],0),g_mat_shiny);
+    
 
     
     
     //Specular reflection 2
     GLfloat h[4];
-    h[0] = (V[0]+L[0])/sqrt((V[0]+L[0])*(V[0]+L[0])+(V[1]+L[1])*(V[1]+L[1])+(V[2]*L[2])*(V[2]+L[2])+(V[3]*L[3])*(V[3]+L[3]));
-    h[1] = (V[1]+L[1])/sqrt((V[0]+L[0])*(V[0]+L[0])+(V[1]+L[1])*(V[1]+L[1])+(V[2]*L[2])*(V[2]+L[2])+(V[3]*L[3])*(V[3]+L[3]));
-    h[2] = (V[2]+L[2])/sqrt((V[0]+L[0])*(V[0]+L[0])+(V[1]+L[1])*(V[1]+L[1])+(V[2]*L[2])*(V[2]+L[2])+(V[3]*L[3])*(V[3]+L[3]));
-    h[3] = (V[3]+L[3])/sqrt((V[0]+L[0])*(V[0]+L[0])+(V[1]+L[1])*(V[1]+L[1])+(V[2]*L[2])*(V[2]+L[2])+(V[3]*L[3])*(V[3]+L[3]));
+    h[0] = (V[0]+L[0])/sqrt((V[0]+L[0])*(V[0]+L[0])+(V[1]+L[1])*(V[1]+L[1])+(V[2]+L[2])*(V[2]+L[2]));
+    h[1] = (V[1]+L[1])/sqrt((V[0]+L[0])*(V[0]+L[0])+(V[1]+L[1])*(V[1]+L[1])+(V[2]+L[2])*(V[2]+L[2]));
+    h[2] = (V[2]+L[2])/sqrt((V[0]+L[0])*(V[0]+L[0])+(V[1]+L[1])*(V[1]+L[1])+(V[2]+L[2])*(V[2]+L[2]));
 
     GLfloat ksI[4];
-    ksI[0] =  ks[0] * I[0];
+    ksI[0] = ks[0] * I[0];
     ksI[1] = ks[1] * I[1];
     ksI[2] = ks[2] * I[2];
-    ksI[3] = ks[3] * I[3];
+    
+
+    //printf("%f %f %f\n", h[0], h[1], h[2]);
 
     GLfloat IsII[4];
-    IsII[0] = ksI[0] * powf(fmax(h[0]*ne[0] + h[1]*ne[1] + h[2]*ne[2] + h[3]*ne[3],0),g_mat_shiny);
-    IsII[1] = ksI[1] * powf(fmax(h[0]*ne[0] + h[1]*ne[1] + h[2]*ne[2] + h[3]*ne[3],0),g_mat_shiny);
-    IsII[2] = ksI[2] * powf(fmax(h[0]*ne[0] + h[1]*ne[1] + h[2]*ne[2] + h[3]*ne[3],0),g_mat_shiny);
-    IsII[3] = ksI[3] * powf(fmax(h[0]*ne[0] + h[1]*ne[1] + h[2]*ne[2] + h[3]*ne[3],0),g_mat_shiny);
+    IsII[0] = ksI[0] * powf(fmax(h[0]*N[0] + h[1]*N[1] + h[2]*N[2],0),g_mat_shiny);
+    IsII[1] = ksI[1] * powf(fmax(h[0]*N[0] + h[1]*N[1] + h[2]*N[2],0),g_mat_shiny);
+    IsII[2] = ksI[2] * powf(fmax(h[0]*N[0] + h[1]*N[1] + h[2]*N[2],0),g_mat_shiny);
+    IsII[3] = ksI[3] * powf(fmax(h[0]*N[0] + h[1]*N[1] + h[2]*N[2],0),g_mat_shiny);
 
+
+    GLfloat cosl = fmax(N[0]*L[0] + N[1]*L[1] + N[2]*L[2],0);
+
+    GLfloat cosv = fmax(V[0]*N[0] + V[1]*N[1] + V[2]*N[2],0);
+
+    GLfloat cosd = fmax(h[0]*L[0] + h[1]*L[1] + h[2]*L[2],0);
+
+    GLfloat FD90 = 0.5 + 2*cosd*cosd;
+
+    GLfloat Pent = (1 + (FD90 - 1)*powf(1-cosl,5) ) * (1 + (FD90 - 1)*powf(1-cosv,5) );
+    fd[0] = g_mat_diff[0] * Pent;
+    fd[1] = g_mat_diff[1] * Pent;
+    fd[2] = g_mat_diff[2] * Pent;
+
+    GLfloat d[3] = {0,0,0};
+    if(diff == 0)
+      {
+	d[0] = Id[0];
+	d[1] = Id[1];
+	d[2] = Id[2];
+      }
+    else
+      {
+	d[0] = fd[0];
+	d[1] = fd[1];
+	d[2] = fd[2];
+      }
     printf("style\n");
     if(style == 0)
       {
 	printf("style is 0\n");
-	out_color[0] = Ia[0] + Id[0] + Is[0];
-	out_color[1] = Ia[1] + Id[1] + Is[1];
-	out_color[2] = Ia[2] + Id[2] + Is[2];
-	out_color[3] = Ia[3] + Id[3] + Is[3];
+	out_color[0] = Ia[0] + d[0] + Is[0];
+	out_color[1] = Ia[1] + d[1] + Is[1];
+	out_color[2] = Ia[2] + d[2] + Is[2];
       }
     else if(style == 1)
       {
 	printf("style is 1\n");
-	out_color[0] = Ia[0] + Id[0] + IsII[0];
-	out_color[1] = Ia[1] + Id[1] + IsII[1];
-	out_color[2] = Ia[2] + Id[2] + IsII[2];
-	out_color[3] = Ia[3] + Id[3] + IsII[3];
+	out_color[0] = Ia[0] + d[0] + IsII[0];
+	out_color[1] = Ia[1] + d[1] + IsII[1];
+	out_color[2] = Ia[2] + d[2] + IsII[2];
       }
     
-    
-    else if(style == 2)
-      {
-	printf("style is 2\n");
-	out_color[0] = fminf(fmaxf(out_color[0], 0.0f), 1.f);
-	out_color[1] = fminf(fmaxf(out_color[1], 0.0f), 1.f);
-	out_color[2] = fminf(fmaxf(out_color[2], 0.0f), 1.f);
-	out_color[3] = 0;
-      }
+    printf("style is 2\n");
+    out_color[0] = fminf(fmaxf(out_color[0], 0.0f), 1.f);
+    out_color[1] = fminf(fmaxf(out_color[1], 0.0f), 1.f);
+    out_color[2] = fminf(fmaxf(out_color[2], 0.0f), 1.f);
 }
 
 // Define a sphere
@@ -334,7 +366,7 @@ static void solidSphere(GLfloat r, int nu, int nv) {
                 
                 glColor3f(c00[0], c00[1], c00[2]);
                 glVertex3f(v00x, v00y, v00z);
-                glColor3f(c01[0], c01[2], c01[2]);
+                glColor3f(c01[0], c01[1], c01[2]);
                 glVertex3f(v01x, v01y, v01z);
                 glNormal3f(c11[0], c11[1], c11[2]);
                 glVertex3f(v11x, v11y, v11z);
@@ -440,114 +472,7 @@ static void setLight() {
     g_light_pos[0][3] = pos0[3];
 }
 
-static void diffuse(GLfloat* pe, GLfloat* ne, GLfloat* out_color)
-{
-  //cos(theta) = max(N*L,0)
-  //cos(phai) = max(V*R,0)
-  //cos(thetah) = max(h*n,0)
-  //ambient light
-    GLfloat ka[4];
-    ka[0] = g_mat_amb[0];
-    ka[1] = g_mat_amb[1];
-    ka[2] = g_mat_amb[2];
-    ka[3] = g_mat_amb[3];
-    GLfloat I[4];
-    I[0] = g_light_amb[g_num_lights][0];
-    I[1] = g_light_amb[g_num_lights][1];
-    I[2] = g_light_amb[g_num_lights][2];
-    I[3] = g_light_amb[g_num_lights][3];
-    GLfloat Ia[4] = {ka[0]*I[0], ka[1]*I[1], ka[2]*I[2], ka[3]*I[3]};
-    //Diffuse reflection
-    GLfloat N[4];
-    N[0] = ne[0];
-    N[1] = ne[1];
-    N[2] = ne[2];
-    N[3] = ne[3];
-    GLfloat L[4];
-    L[0] = g_light_pos[g_num_lights][0] - pe[0];
-    L[1] = g_light_pos[g_num_lights][1] - pe[1];
-    L[2] = g_light_pos[g_num_lights][2] - pe[2];
-    L[3] = g_light_pos[g_num_lights][3] - pe[3];
-    GLfloat kd[4];
-    kd[0] = g_mat_diff[0];
-    kd[1] = g_mat_diff[1];
-    kd[2] = g_mat_diff[2];
-    kd[3] = g_mat_diff[3];
-    I[0] = g_light_diff[g_num_lights][0];
-    I[1] = g_light_diff[g_num_lights][1];
-    I[2] = g_light_diff[g_num_lights][2];
-    I[3] = g_light_diff[g_num_lights][3];
 
-    GLfloat kdI[4];
-    kdI[0] = kd[0] * I[0];
-    kdI[1] = kd[1] * I[1];
-    kdI[2] = kd[2] * I[2];
-    kdI[3] = kd[3] * I[3];
-    
-    GLfloat cosl;
-    cosl = fmax(N[0]*L[0] + N[1]*L[1] + N[2]*L[2] + N[3]*L[3],0);
-    
-    
-    //Specular reflection 1
-    GLfloat V[4] = {0,0,0,0};
-    GLfloat NL = (-L[0]*N[0]-L[1]*N[1]-L[2]*N[2]-L[3]*N[3]);
-    GLfloat R[4];
-    I[0] = -L[0];
-    I[1] = -L[1];
-    I[2] = -L[2];
-    I[3] = -L[3];
-    R[0] = (-L[0] - 2*N[0]*NL);
-    R[1] = (-L[1] - 2*N[1]*NL);
-    R[2] = (-L[2] - 2*N[2]*NL);
-    R[3] = (-L[3] - 2*N[3]*NL);
-    
-    GLfloat G;
-    if(-NL > 0)
-      {
-	G = 1;
-      }
-    else
-      {
-	G = 0;
-      }
-    
-    GLfloat ks[4];
-    ks[0] = g_mat_spec[0];
-    ks[1] = g_mat_spec[1];
-    ks[2] = g_mat_spec[2];
-    ks[3] = g_mat_spec[3];
-    
-
-    GLfloat ksIG[4];
-    ksIG[0] = ks[0] * I[0] * G;
-    ksIG[1] = ks[1] * I[1] * G;
-    ksIG[2] = ks[2] * I[2] * G;
-    ksIG[3] = ks[3] * I[3] * G;
-
-    GLfloat cosv;
-    
-    cosv = fmax(N[0]*V[0] + N[1]*V[1] + N[2]*V[2] + N[3]*V[3],0);
-
-    
-    //Specular reflection 2
-    GLfloat h[4];
-    h[0] = (V[0]+L[0])/sqrt((V[0]+L[0])*(V[0]+L[0])+(V[1]+L[1])*(V[1]+L[1])+(V[2]*L[2])*(V[2]+L[2]));
-    h[1] = (V[1]+L[1])/sqrt((V[0]+L[0])*(V[0]+L[0])+(V[1]+L[1])*(V[1]+L[1])+(V[2]*L[2])*(V[2]+L[2]));
-    h[2] = (V[2]+L[2])/sqrt((V[0]+L[0])*(V[0]+L[0])+(V[1]+L[1])*(V[1]+L[1])+(V[2]*L[2])*(V[2]+L[2]));
-    h[3] = (V[3]+L[3])/sqrt((V[0]+L[0])*(V[0]+L[0])+(V[1]+L[1])*(V[1]+L[1])+(V[2]*L[2])*(V[2]+L[2]));
-
-    GLfloat ksI[4];
-    ksI[0] =  ks[0] * I[0];
-    ksI[1] = ks[1] * I[1];
-    ksI[2] = ks[2] * I[2];
-    ksI[3] = ks[3] * I[3];
-
-    GLfloat cosd;
-    cosd = fmax(h[0]*ne[0] + h[1]*ne[1] + h[2]*ne[2] + h[3]*ne[3],0);
-
-
-    
-}
 
 static void display(void) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -558,8 +483,8 @@ static void display(void) {
         glShadeModel(GL_FLAT);
 
     glLoadIdentity();
-    gluLookAt(0.0, 0.0, 10.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
-
+    gluLookAt(Eye[0], Eye[1], Eye[2], 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
+    
     glPushMatrix();
 
     drawFloor();
@@ -605,14 +530,22 @@ static void keyboard(unsigned char key, int x, int y) {
 	}
       else if (style == 1)
 	{
-	  printf("change to 2\n");
-	  style = 2;
-	  break;
-	}
-      else if (style == 2)
-	{
 	  printf("change to 0\n");
 	  style = 0;
+	  break;
+	}
+
+    case 'd':
+      if(diff == 0)
+	{
+	 
+	  diff = 1;
+	  break;
+	}
+      else
+	{
+	  
+	  diff = 0;
 	  break;
 	}
       
