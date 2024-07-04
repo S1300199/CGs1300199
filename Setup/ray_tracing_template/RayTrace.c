@@ -39,7 +39,7 @@ hitSphere(Vector3 origin, Vector3 direction, Sphere sphere, float* t)
   computeNorm(origin, &o);
   float c;
   computeNorm(sphere._center, &c);
-  *t = -2*(od-dc) - sqrt(powf((od-dc),2) - o*o - c*c + 2*oc + powf(sphere._radius,2));
+  *t = -(od-dc) - sqrt(powf((od-dc),2) - o*o - c*c + 2*oc + powf(sphere._radius,2));
   //*t /=2;
   if(*t > 0)return 1;
   else
@@ -142,17 +142,17 @@ shade(Vector3 hit_pos, Vector3 hit_normal,
 {
     // Complete
     // ambient component
-  //color->_x = 0;
-  //color->_y = 0;
-  //color->_z = 0;
-
+  color->_red = scene._ambient._red;
+  color->_green = scene._ambient._green;
+  color->_blue = scene._ambient._blue;
+  
      // for each light in the scene
     int l;
     for (l = 0; l < scene._number_lights; l++) {
       // Complete
       // Form a shadow ray and check if the hit point is under
       // direct illumination from the light source
-     
+      
       // Complete
       // diffuse component
       Vector3 N;
@@ -190,15 +190,13 @@ shade(Vector3 hit_pos, Vector3 hit_normal,
       
       // Complete
       // specular component
-      GLfloat V[4];
-      GLfloat Eye[3];
-      Eye[0] = scene._camera._x;
-      Eye[1] = scene._camera._y;
-      Eye[2] = scene._camera._z;
+      Vector3 V;
+      Vector3 Eye;
+      Eye._x = scene._camera._x;
+      Eye._y = scene._camera._y;
+      Eye._z = scene._camera._z;
 			   
-      V[0] = Eye[0]/sqrt(Eye[0]*Eye[0] + Eye[1]*Eye[1] + Eye[2]*Eye[2]);
-      V[1] = Eye[1]/sqrt(Eye[0]*Eye[0] + Eye[1]*Eye[1] + Eye[2]*Eye[2]);
-      V[2] = Eye[2]/sqrt(Eye[0]*Eye[0] + Eye[1]*Eye[1] + Eye[2]*Eye[2]);
+      normalize(Eye, &V);
       
       
       
@@ -209,27 +207,45 @@ shade(Vector3 hit_pos, Vector3 hit_normal,
       
       
       //spec2
-      GLfloat h[3];
-      
+      Vector3 VplusL;
+      add(V , L, &VplusL);
+      Vector3 h;
+      normalize(VplusL,&h);
+
+      GLfloat ks[3];
+      ks[0] = hit_spec._red;
+      ks[1] = hit_spec._green;
+      ks[2] = hit_spec._blue;
       
       GLfloat ksI[3];
-     
+      ksI[0] = ks[0] * I[0];
+      ksI[1] = ks[1] * I[1];
+      ksI[2] = ks[2] * I[2];
       
 
     //printf("%f %f %f\n", h[0], h[1], h[2]);
-
-    GLfloat IsII[3];
-    
+      GLfloat hN;
+      computeDotProduct(h,N,&hN);
+      GLfloat IsII[3];
+      IsII[0] = ksI[0] * powf(fmax(hN,0),555);
+      IsII[1] = ksI[1] * powf(fmax(hN,0),555);
+      IsII[2] = ksI[2] * powf(fmax(hN,0),555);
    
-    
+      Vector3 cross;
 
-    color->_red = scene._ambient._red + Id[0];
-    color->_green = scene._ambient._green + Id[1];
-    color->_blue = scene._ambient._blue + Id[2] ;
-      
-    color->_red = fminf(fmaxf(color->_red, 0.0f), 1.f);
-    color->_green = fminf(fmaxf(color->_green, 0.0f), 1.f);
-    color->_blue = fminf(fmaxf(color->_blue, 0.0f), 1.f);
+      Vector3 dummya,dummyb;
+      Color dummyc,dummyg;
+      int H = hitScene(hit_pos, L, scene, &dummya, &dummyb, &dummyc, &dummyg);
+      //computeCrossProduct(,scene._lights[l]._light_pos,&cross);
+      if(H == 0)
+	{
+	  color->_red += Id[0] + IsII[0];
+	  color->_green += Id[1] + IsII[1];
+	  color->_blue += Id[2] + IsII[2];
+	}
+      color->_red = fminf(fmaxf(color->_red, 0.0f), 1.f);
+      color->_green = fminf(fmaxf(color->_green, 0.0f), 1.f);
+      color->_blue = fminf(fmaxf(color->_blue, 0.0f), 1.f);
     }
 }
 
@@ -282,50 +298,72 @@ void rayTraceScene(Scene scene, int width, int height, GLubyte** texture) {
 
     screen_scale = scene._scale;
 
+   
+    Color color;
     // go through each pixel
     // and check for intersection between the ray and the scene
     for (i = 0; i < height; i++) {
         for (j = 0; j < width; j++) {
-            // Compute (x,y) coordinates for the current pixel 
-            // in scene space
-            float x = screen_scale * j - 0.5f * screen_scale * width;
-            float y = screen_scale * i - 0.5f * screen_scale * height;
-
-            // Form the vector camera to current pixel
-            Vector3 direction;
-            Vector3 direction_normalized;
-
-            direction._x = x - camera_pos._x;
-            direction._y = y - camera_pos._y;
-            direction._z = -camera_pos._z;
-
-            normalize(direction, &direction_normalized);
-
-            Vector3 origin = scene._camera;
-            Color color;
-            color._red = 0.f;
-            color._green = 0.f;
-            color._blue = 0.f;
-            rayTrace(origin, direction_normalized, scene, &color);
-
-            // Gamma 
-            color._red = color._red * 1.1f - 0.02f;
-            color._green = color._green * 1.1f - 0.02f;
-            color._blue = color._blue * 1.1f - 0.02f;
-            clamp(&color, 0.f, 1.f);
-            color._red = powf(color._red, 0.4545f);
-            color._green = powf(color._green, 0.4545f);
-            color._blue = powf(color._blue, 0.4545f);
-
-            // Contrast 
-            color._red = color._red * color._red * (3.f - 2.f*color._red);
-            color._green = color._green * color._green * (3.f - 2.f*color._green);
-            color._blue = color._blue * color._blue * (3.f - 2.f*color._blue);
-
-            image[i][j] = color;
+	   Color SUM;
+	   SUM._red = 0;
+	   SUM._blue = 0;
+	   SUM._green = 0;
+	   for(int k = 0;k < 10;k++)
+	     {
+	  
+	       // Compute (x,y) coordinates for the current pixel 
+	       // in scene space
+	       float x = screen_scale * j - 0.5f * screen_scale * width;
+	       float y = screen_scale * i - 0.5f * screen_scale * height;
+	       
+	       // Form the vector camera to current pixel
+	       Vector3 direction;
+	       Vector3 direction_normalized;
+	       
+	       
+	       //float random = -screen_scale/2 + (float)(rand() * (screen_scale + 1)/(1 + (float)RAND_MAX));
+	       float random = (float)rand()/RAND_MAX*screen_scale-screen_scale/2;
+	       x += random;
+	       y += random;
+	       
+	       
+	       direction._x = x - camera_pos._x;
+	       direction._y = y - camera_pos._y;
+	       direction._z = -camera_pos._z;
+	       
+	       normalize(direction, &direction_normalized);
+	       
+	       Vector3 origin = scene._camera;
+	      
+	       color._red = 0.f;
+	       color._green = 0.f;
+	       color._blue = 0.f;
+	       rayTrace(origin, direction_normalized, scene, &color);
+	       
+	       // Gamma 
+	       color._red = color._red * 1.1f - 0.02f;
+	       color._green = color._green * 1.1f - 0.02f;
+	       color._blue = color._blue * 1.1f - 0.02f;
+	       clamp(&color, 0.f, 1.f);
+	       color._red = powf(color._red, 0.4545f);
+	       color._green = powf(color._green, 0.4545f);
+	       color._blue = powf(color._blue, 0.4545f);
+	       
+	       // Contrast 
+	       color._red = color._red * color._red * (3.f - 2.f*color._red);
+	       color._green = color._green * color._green * (3.f - 2.f*color._green);
+	       color._blue = color._blue * color._blue * (3.f - 2.f*color._blue);
+	       SUM._red += color._red;
+	       SUM._blue += color._blue;
+	       SUM._green += color._green;
+	     }
+	   color._red = SUM._red/10;
+	   color._blue = SUM._blue/10;
+	   color._green = SUM._green/10;
+	   image[i][j] = color;
         }
     }
-
+    
     // save image to texture buffer
     saveRaw(image, width, height, texture);
 

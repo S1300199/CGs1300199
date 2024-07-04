@@ -29,10 +29,19 @@ static void clamp(Color* c, float low, float high) {
 static int
 hitSphere(Vector3 origin, Vector3 direction, Sphere sphere, float* t)
 {
-  float od = (origin._x*direction._x + origin._y*direction._y + origin._z*direction._z);
-  float o = powf(origin._x,2) + powf(origin._y,2) + powf(origin._z,2);
-  float s = -od - sqrt(powf(od,2) - o +1);
-  if(s > 0)return 1;
+  Vector3 oritwo;
+  sub(origin , sphere._center, &oritwo);
+  float od,oc,dc;
+  computeDotProduct(origin, direction, &od);
+  computeDotProduct(origin, sphere._center, &oc);
+  computeDotProduct(direction, sphere._center, &dc);
+  float o;
+  computeNorm(origin, &o);
+  float c;
+  computeNorm(sphere._center, &c);
+  *t = -(od-dc) - sqrt(powf((od-dc),2) - o*o - c*c + 2*oc + powf(sphere._radius,2));
+  //*t /=2;
+  if(*t > 0)return 1;
   else
     return 0;
 }
@@ -133,9 +142,9 @@ shade(Vector3 hit_pos, Vector3 hit_normal,
 {
     // Complete
     // ambient component
-  color._x = 0;
-  color._y = 0;
-  color._z = 0;
+  color->_red = scene._ambient._red;
+  color->_green = scene._ambient._green;
+  color->_blue = scene._ambient._blue;
 
      // for each light in the scene
     int l;
@@ -143,113 +152,96 @@ shade(Vector3 hit_pos, Vector3 hit_normal,
       // Complete
       // Form a shadow ray and check if the hit point is under
       // direct illumination from the light source
-      GLfloat ka[4];
-      ka[0] = g_mat_amb[0];
-      ka[1] = g_mat_amb[1];
-      ka[2] = g_mat_amb[2];
-      
-      GLfloat I[4];
-      I[0] = g_light_amb[0][0];
-      I[1] = g_light_amb[0][1];
-      I[2] = g_light_amb[0][2];
-      
-      GLfloat Ia[4] = {ka[0]*I[0], ka[1]*I[1], ka[2]*I[2]};
+     
       // Complete
       // diffuse component
-      GLfloat N[4];
-      GLfloat UnitN = sqrt(ne[0]*ne[0] + ne[1]*ne[1] + ne[2]*ne[2]);
-      N[0] = ne[0]/UnitN;
-      N[1] = ne[1]/UnitN;
-      N[2] = ne[2]/UnitN;
+      Vector3 N;
+      normalize(hit_normal, &N);
       
-      GLfloat L[4];
-      L[0] = g_light_pos[0][0] - pe[0];
-      L[1] = g_light_pos[0][1] - pe[1];
-      L[2] = g_light_pos[0][2] - pe[2];
+      Vector3 L;
       
-      GLfloat UnitL = sqrt(L[0]*L[0] + L[1]*L[1] + L[2]*L[2]);
-      L[0] /= UnitL;
-      L[1] /= UnitL;
-      L[2] /= UnitL;
+      sub(scene._lights[l]._light_pos, hit_pos, &L);
+      
+      normalize(L, &L);
     
-    
-      GLfloat kd[4];
-      kd[0] = g_mat_diff[0];
-      kd[1] = g_mat_diff[1];
-      kd[2] = g_mat_diff[2];
-    
-      I[0] = g_light_diff[0][0];
-      I[1] = g_light_diff[0][1];
-      I[2] = g_light_diff[0][2];
-    
+      GLfloat kd[3];
+      kd[0] = hit_color._red;
+      kd[1] = hit_color._green;
+      kd[2] = hit_color._blue;
 
-      GLfloat kdI[4];
+      
+      GLfloat I[3];
+      I[0] = scene._lights[l]._light_color._red;
+      I[1] = scene._lights[l]._light_color._green;
+      I[2] = scene._lights[l]._light_color._blue;
+      
+      
+      GLfloat kdI[3];
       kdI[0] = kd[0] * I[0];
       kdI[1] = kd[1] * I[1];
       kdI[2] = kd[2] * I[2];
-    
-    
+      
+      float NL;
+      computeDotProduct(N,L,&NL);
       GLfloat Id[4];
-      Id[0] = kdI[0] * fmax(N[0]*L[0] + N[1]*L[1] + N[2]*L[2],0);
-      Id[1] = kdI[1] * fmax(N[0]*L[0] + N[1]*L[1] + N[2]*L[2],0);
-      Id[2] = kdI[2] * fmax(N[0]*L[0] + N[1]*L[1] + N[2]*L[2],0);
-
+      Id[0] = kdI[0] * fmax(NL,0);
+      Id[1] = kdI[1] * fmax(NL,0);
+      Id[2] = kdI[2] * fmax(NL,0);
+      
       // Complete
       // specular component
-      GLfloat V[4];
-    V[0] = Eye[0]/sqrt(Eye[0]*Eye[0] + Eye[1]*Eye[1] + Eye[2]*Eye[2]);
-    V[1] = Eye[1]/sqrt(Eye[0]*Eye[0] + Eye[1]*Eye[1] + Eye[2]*Eye[2]);
-    V[2] = Eye[2]/sqrt(Eye[0]*Eye[0] + Eye[1]*Eye[1] + Eye[2]*Eye[2]);
-
-    I[0] = -L[0];
-    I[1] = -L[1];
-    I[2] = -L[2];;
-    GLfloat NL = (I[0]*N[0]+I[1]*N[1]+I[2]*N[2]);
-    
-    GLfloat R[4];
-    R[0] = (I[0] - 2*N[0]*NL);
-    R[1] = (I[1] - 2*N[1]*NL);
-    R[2] = (I[2] - 2*N[2]*NL);
-    
-    GLfloat G;
-    if(-NL > 0)
-      {
-	G = 1;
-      }
-    else
-      {
-	G = 0;
-      }
-    
-    GLfloat ks[4];
-    ks[0] = g_mat_spec[0];
-    ks[1] = g_mat_spec[1];
-    ks[2] = g_mat_spec[2];
-   
-    I[0] = g_light_spec[0][0];
-    I[1] = g_light_spec[0][1];
-    I[2] = g_light_spec[0][2];
-    
-
-    GLfloat ksIG[4];
-    ksIG[0] = ks[0] * I[0] * G;
-    ksIG[1] = ks[1] * I[1] * G;
-    ksIG[2] = ks[2] * I[2] * G;
-   
-    GLfloat Is[4];
-    GLfloat IsI[4];
-    
-    IsI[0] = ksIG[0] * powf(fmax(V[0]*R[0] + V[1]*R[1] + V[2]*R[2],0),g_mat_shiny);
-    IsI[1] = ksIG[1] * powf(fmax(V[0]*R[0] + V[1]*R[1] + V[2]*R[2],0),g_mat_shiny);
-    IsI[2] = ksIG[2] * powf(fmax(V[0]*R[0] + V[1]*R[1] + V[2]*R[2],0),g_mat_shiny);
-
-    out_color[0] = Ia[0] + d[0] + Is[0];
-    out_color[1] = Ia[1] + d[1] + Is[1];
-    out_color[2] = Ia[2] + d[2] + Is[2];
+      Vector3 V;
+      Vector3 Eye;
+      Eye._x = scene._camera._x;
+      Eye._y = scene._camera._y;
+      Eye._z = scene._camera._z;
+			   
+      normalize(Eye, &V);
       
-    out_color[0] = fminf(fmaxf(out_color[0], 0.0f), 1.f);
-    out_color[1] = fminf(fmaxf(out_color[1], 0.0f), 1.f);
-    out_color[2] = fminf(fmaxf(out_color[2], 0.0f), 1.f);
+      
+      
+      I[0] = scene._lights[l]._light_color._red;
+      I[1] = scene._lights[l]._light_color._green;
+      I[2] = scene._lights[l]._light_color._blue;
+      
+      
+      
+      //spec2
+      Vector3 VplusL;
+      add(V , L, &VplusL);
+      Vector3 h;
+      normalize(VplusL,&h);
+
+      GLfloat ks[3];
+      ks[0] = hit_spec._red;
+      ks[1] = hit_spec._green;
+      ks[2] = hit_spec._blue;
+      
+      GLfloat ksI[3];
+      ksI[0] = ks[0] * I[0];
+      ksI[1] = ks[1] * I[1];
+      ksI[2] = ks[2] * I[2];
+      
+
+    //printf("%f %f %f\n", h[0], h[1], h[2]);
+      GLfloat hN;
+      computeDotProduct(h,N,&hN);
+      GLfloat IsII[3];
+      IsII[0] = ksI[0] * powf(fmax(hN,0),555);
+      IsII[1] = ksI[1] * powf(fmax(hN,0),555);
+      IsII[2] = ksI[2] * powf(fmax(hN,0),555);
+   
+      Vector3 cross;
+      //computeCrossProduct(,scene._lights[l]._light_pos,&cross);
+      if(hit_pos == NULL)
+	{
+	  color->_red += Id[0] + IsII[0];
+	  color->_green += Id[1] + IsII[1];
+	  color->_blue += Id[2] + IsII[2];
+	}
+      color->_red = fminf(fmaxf(color->_red, 0.0f), 1.f);
+      color->_green = fminf(fmaxf(color->_green, 0.0f), 1.f);
+      color->_blue = fminf(fmaxf(color->_blue, 0.0f), 1.f);
     }
 }
 
