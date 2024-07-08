@@ -34,6 +34,7 @@ static GLfloat m[16] = {1.f,0.f,0.f,0.f,
 			0.f,1.f,0.f,0.f,
 			0.f,0.f,1.f,0.f,
 			0.f,0.f,0.f,1.f};
+int level = 5;
 
 // Model-View transforms
 static void myTranslatef(GLfloat tx, GLfloat ty, GLfloat tz) {
@@ -99,6 +100,31 @@ static void myPerspective(GLfloat fovy, GLfloat aspect, GLfloat near, GLfloat fa
   
 }
 
+static void myLookAt(GLfloat eyex, GLfloat eyey, GLfloat eyez, GLfloat centerx, GLfloat centery, GLfloat centerz, GLfloat upx, GLfloat upy, GLfloat upz)
+{
+  GLfloat s = sqrt((eyex - centerx)*(eyex - centerx) + (eyey - centery)*(eyey - centery) + (eyez - centerz)*(eyez - centerz));
+  GLfloat t = sqrt(upx*upx + upy*upy + upz * upz);
+  GLfloat cx = (eyex - centerx)/s;
+  GLfloat cy = (eyey - centery)/s;
+  GLfloat cz = (eyez - centerz)/s;
+  GLfloat bx = upx/t;
+  GLfloat by = upy/t;
+  GLfloat bz = upz/t;
+  GLfloat ax = by*cz - bz*cy;
+  GLfloat ay = bz*cx - bx*cz;
+  GLfloat az = bx*cy - by*cx;
+  GLfloat eye = (-ax*eyex) + (-ay*eyey) + (-az*eyez);
+  //printf("%f %f %f\n", ax, ay, az);
+  GLfloat Y[] =
+    {
+      ax, bx, cx, 0,
+      ay, by, cy, 0,
+      az, bz, cz, 0,
+      eye, eye, eye, 1
+    };
+  glMultMatrixf(Y);
+}
+
 static void drawIcosahedron(void) {
     GLfloat phi = (1.f + sqrtf(5.f)) * .5f;
     GLfloat a = 1.f;
@@ -149,7 +175,7 @@ void drawIcosahedronRecursive(int currentLevel, int maxLevel) {
     }
 
     //このあと左右に小さなIcosahedronを描画するのでそれを再帰で行う。
-
+    
     //glPushMatrix()とglPopMatrix()の間行われた変形はもとの座標に影響を与えない。
     //次に行われる描画のために「新しい座標軸」を準備してあげるイメージ。
     glPushMatrix();
@@ -180,7 +206,7 @@ static void display(void) {
         // After completing the code of myPerspective() above, 
         // replace the call to gluPerspective with a call to myPerspective 
         // or gluPerspective depending on the transformation mode
-        myPerspective(45.0, (GLdouble)g_width / (GLdouble)g_height, 0.1, 20.0);
+        myPerspective(_PI/2, (GLdouble)g_width / (GLdouble)g_height, 0.1, 20.0);
     }
     else {
         // Complete: 
@@ -193,7 +219,7 @@ static void display(void) {
     // Modelview transformation
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-    gluLookAt(0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
+    myLookAt(0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
 
 
     glPushMatrix();
@@ -211,7 +237,7 @@ static void display(void) {
     myScalef(g_scale[0], g_scale[1], g_scale[2]);
 
     //drawIcosahedron();
-    drawIcosahedronRecursive(1, 5);
+    drawIcosahedronRecursive(1, level);
 
     glPopMatrix();
 
@@ -248,7 +274,12 @@ static void keyboard(unsigned char k, int x, int y) {
 
         // Complete: 
         // Allow to switch between OpenGL transformations and your implementations
-
+    case 'm':
+      level--;
+      break;
+    case 'N':
+      level++;
+      break;
     case 'p':
         g_proj_mode = (1 - g_proj_mode);
         break;
